@@ -143,6 +143,7 @@
     <div class="admin-actions">
       <button id="addPlanetBtn" class="btn">Agregar planeta</button>
       <button id="saveAdminBtn" class="btn">Guardar cambios</button>
+      <button id="resetProgressBtn" class="btn">Reiniciar recorrido</button>
       <button id="adminLogoutBtn" class="btn">Cerrar sesión</button>
     </div>
     <div id="adminStatus" role="status"></div>
@@ -785,6 +786,15 @@ $('addPlanetBtn').onclick = () => {
   adminDraftPlanets.push(newPlanet(adminDraftPlanets.length));
   renderPlanetEditor();
   $('planetEditorList').lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+$('resetProgressBtn').onclick = () => {
+  if (!confirm('¿Reiniciar el recorrido desde la primera pista?')) return;
+  done = 0;
+  saveProgress();
+  refreshStates();
+  closeModal();
+  $('adminPanel').classList.remove('show');
+  $('intro').classList.add('show');
 };
 $('saveAdminBtn').onclick = () => {
   const intro = $('editIntro').value.trim();
