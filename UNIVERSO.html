@@ -264,6 +264,9 @@ function parseVideoSource(value) {
     embed.searchParams.set('mute', '1');
     embed.searchParams.set('playsinline', '1');
     embed.searchParams.set('rel', '0');
+    if (location.protocol !== 'file:' && location.origin !== 'null') {
+      embed.searchParams.set('origin', location.origin);
+    }
     return { type: 'youtube', url: embed.href };
   }
   if (!/\.(mp4|webm|ogg)$/i.test(url.pathname)) return null;
@@ -594,7 +597,15 @@ function renderClueVideo(value) {
     link.rel = 'noopener noreferrer';
     link.textContent = '¿No se reproduce? Abrir video en YouTube';
     link.style.cssText = 'display:inline-block;margin-top:8px;color:var(--gold);font:600 13px var(--sans)';
-    container.append(frame, link);
+    if (location.protocol === 'file:') {
+      const note = document.createElement('div');
+      note.id = 'clueVideoStatus';
+      note.setAttribute('role', 'status');
+      note.textContent = 'Este archivo se abrió directamente desde tu equipo. YouTube bloquea el reproductor incrustado en este modo (Error 153). Abre el sitio desde una dirección web o con un servidor local, como Live Server en VS Code.';
+      container.append(frame, note, link);
+    } else {
+      container.append(frame, link);
+    }
     return;
   }
 
