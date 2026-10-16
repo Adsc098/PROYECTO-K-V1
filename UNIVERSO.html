@@ -1,0 +1,958 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Nuestro universo</title>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,400;1,500&family=Quicksand:wght@400;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#05030a; --sun:#ffb347; --rose:#e0314f; --petal:#ff9db1; --gold:#f5d38a; --ink:#fbeff2;
+    --serif:'Cormorant Garamond', Georgia, serif; --sans:'Quicksand', system-ui, sans-serif;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%;background:var(--void);color:var(--ink);font-family:var(--sans);overflow:hidden}
+  #scene{position:fixed;inset:0;width:100%;height:100%;display:block;touch-action:none;cursor:grab}
+  #scene:active{cursor:grabbing}
+
+  /* Etiquetas flotando sobre los planetas */
+  #labels{position:fixed;inset:0;pointer-events:none;z-index:5}
+  .lbl{position:absolute;transform:translate(-50%,-50%);font-size:13px;font-weight:600;white-space:nowrap;
+       padding:4px 10px;border-radius:999px;background:rgba(10,6,20,.55);border:1px solid rgba(255,255,255,.14);
+       backdrop-filter:blur(4px);transition:opacity .3s}
+  .lbl.locked{opacity:.55}
+  .lbl.open{border-color:var(--petal);color:var(--petal);box-shadow:0 0 14px rgba(255,157,177,.45)}
+  .lbl.done{border-color:var(--gold);color:var(--gold)}
+
+  /* HUD */
+  #hud{position:fixed;left:0;right:0;top:0;z-index:10;display:flex;justify-content:space-between;align-items:flex-start;
+       padding:16px 18px;pointer-events:none}
+  #hud h1{margin:0;font-family:var(--serif);font-style:italic;font-weight:500;font-size:clamp(22px,4vw,30px);color:var(--gold)}
+  #hud small{display:block;margin-top:4px;opacity:.7;font-size:12px;max-width:260px;line-height:1.4}
+  #progress{font-size:14px;font-weight:600;color:var(--petal);text-align:right}
+  #btnFinal{pointer-events:auto;margin-top:8px;display:none;background:var(--rose);color:#fff;border:0;border-radius:999px;
+            padding:9px 16px;font:600 13px var(--sans);cursor:pointer}
+  #adminBtn{position:fixed;top:48px;right:18px;z-index:70;background:rgba(255,255,255,.12);color:var(--ink);
+            border:1px solid rgba(255,255,255,.22);border-radius:999px;padding:8px 13px;font:600 12px var(--sans);cursor:pointer}
+
+  /* Paneles */
+  .overlay{position:fixed;inset:0;display:none;align-items:center;justify-content:center;padding:20px}
+  .overlay.show{display:flex}
+  #intro{z-index:50;background:radial-gradient(ellipse at center,rgba(5,3,10,.55),rgba(5,3,10,.92))}
+  #modal{z-index:40;background:rgba(5,3,10,.6);backdrop-filter:blur(3px)}
+  .card{position:relative;max-width:560px;width:100%;padding:34px 30px 28px;border-radius:22px;
+        background:linear-gradient(160deg,rgba(40,14,34,.93),rgba(12,8,28,.95));
+        border:1px solid rgba(245,211,138,.28);box-shadow:0 0 60px rgba(224,49,79,.18)}
+  .card h2{margin:0 0 14px;font-family:var(--serif);font-weight:600;font-size:28px;color:var(--gold)}
+  .card p{margin:0;font-family:var(--serif);font-size:clamp(20px,3.6vw,24px);line-height:1.5}
+  #introText{min-height:210px;font-style:italic}
+  .btn{margin-top:22px;background:var(--rose);color:#fff;border:0;border-radius:999px;padding:12px 24px;
+       font:600 15px var(--sans);cursor:pointer;transition:transform .15s,box-shadow .15s}
+  .btn:hover{transform:translateY(-1px);box-shadow:0 6px 20px rgba(224,49,79,.4)}
+  .btn:focus-visible,#codeInput:focus-visible,#close:focus-visible{outline:2px solid var(--gold);outline-offset:3px}
+  #startBtn{opacity:0;pointer-events:none;transition:opacity 1s}
+  #startBtn.ready{opacity:1;pointer-events:auto}
+  #close{position:absolute;top:10px;right:14px;background:none;border:0;color:var(--ink);font-size:26px;cursor:pointer;opacity:.7}
+  .codeRow{display:flex;gap:10px;margin-top:22px;flex-wrap:wrap}
+  .codeLabel{margin-top:22px;font:600 13px var(--sans);opacity:.75}
+  #codeInput{flex:1;min-width:150px;padding:12px 16px;border-radius:12px;border:1px solid rgba(255,255,255,.25);
+             background:rgba(255,255,255,.06);color:#fff;font:600 20px var(--sans);letter-spacing:.25em;text-align:center}
+  .codeRow .btn{margin-top:0}
+  #msg{min-height:22px;margin-top:12px;font:600 14px var(--sans)}
+  #msg.bad{color:#ff8c9d}
+  #msg.good{color:var(--gold)}
+  .shake{animation:shake .4s}
+  @keyframes shake{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
+
+  /* Final */
+  #finale{z-index:60;background:radial-gradient(ellipse at 50% 100%,#3a0818 0%,#14061a 55%,#05030a 100%);display:none}
+  #finale.show{display:block}
+  #roses{position:absolute;inset:0;width:100%;height:100%}
+  #finalMsg{position:absolute;left:50%;top:7%;transform:translateX(-50%);width:min(680px,90vw);text-align:center}
+  #finalMsg h2{margin:0 0 14px;font-family:var(--serif);font-style:italic;font-weight:500;font-size:clamp(34px,7vw,56px);color:var(--gold);
+               opacity:0;transition:opacity 2s}
+  #finalMsg p{margin:0;font-family:var(--serif);font-size:clamp(19px,3.4vw,25px);line-height:1.55;min-height:150px}
+  #back{position:absolute;right:18px;bottom:18px;opacity:0;pointer-events:none;transition:opacity 1.5s;margin:0;
+        background:rgba(255,255,255,.12);padding:10px 18px}
+  #back.ready{opacity:1;pointer-events:auto}
+  #adminLogin,#adminPanel{z-index:80;background:rgba(5,3,10,.88);backdrop-filter:blur(6px)}
+  .admin-card{max-height:90vh;overflow:auto}
+  .admin-card p{font-size:16px}
+  .admin-card input,.admin-card textarea{width:100%;margin:6px 0 14px;padding:10px 12px;border:1px solid rgba(255,255,255,.25);
+    border-radius:10px;background:rgba(255,255,255,.07);color:#fff;font:500 15px var(--sans)}
+  .admin-card textarea{min-height:80px;resize:vertical;line-height:1.45}
+  .admin-card label{display:block;font:600 13px var(--sans);color:var(--gold)}
+  .admin-card .admin-actions{display:flex;gap:8px;flex-wrap:wrap}
+  .admin-card .admin-actions .btn{margin-top:12px}
+  #planetEditorList{display:grid;gap:12px;margin-top:18px}
+  .planet-editor{padding:14px;border:1px solid rgba(255,255,255,.18);border-radius:14px;background:rgba(255,255,255,.04)}
+  .planet-editor h3{margin:0 0 10px;color:var(--petal);font:600 17px var(--serif)}
+  .planet-editor .btn{margin-top:0;padding:8px 13px;font-size:12px}
+  .admin-note{opacity:.75;font:12px/1.5 var(--sans)!important}
+  #adminStatus{min-height:20px;color:var(--gold);font:600 13px var(--sans)}
+
+  @media (prefers-reduced-motion:reduce){.shake{animation:none}}
+</style>
+</head>
+<body>
+
+<canvas id="scene"></canvas>
+<div id="labels"></div>
+
+<div id="hud">
+  <div>
+    <h1>Nuestro universo</h1>
+    <small>Arrastra para girar · rueda o pellizco para acercar · toca un planeta</small>
+  </div>
+  <div>
+    <div id="progress"></div>
+    <button id="btnFinal">Ver mi mensaje final</button>
+  </div>
+</div>
+<button id="adminBtn">Administrar</button>
+
+<div id="adminLogin" class="overlay" role="dialog" aria-modal="true" aria-labelledby="adminLoginTitle">
+  <div class="card admin-card">
+    <h2 id="adminLoginTitle">Acceso de administrador</h2>
+    <p id="adminLoginHelp"></p>
+    <label for="adminPassword">Contraseña</label>
+    <input id="adminPassword" type="password" autocomplete="current-password">
+    <div id="adminLoginStatus" role="status"></div>
+    <div class="admin-actions">
+      <button id="adminLoginBtn" class="btn">Entrar</button>
+      <button id="adminLoginCancel" class="btn">Cancelar</button>
+    </div>
+  </div>
+</div>
+
+<div id="adminPanel" class="overlay" role="dialog" aria-modal="true" aria-labelledby="adminPanelTitle">
+  <div class="card admin-card">
+    <h2 id="adminPanelTitle">Editar el universo</h2>
+    <label for="editIntro">Mensaje de entrada</label>
+    <textarea id="editIntro"></textarea>
+    <label for="editFinalTitle">Título del mensaje final</label>
+    <input id="editFinalTitle">
+    <label for="editFinalMessage">Mensaje final</label>
+    <textarea id="editFinalMessage"></textarea>
+    <h2>Planetas, pistas y pruebas</h2>
+    <p class="admin-note">El código es la respuesta de cada prueba. Al cambiar los nombres, pistas, respuestas o cantidad de planetas, el recorrido se reiniciará para mantener el orden correcto.</p>
+    <div id="planetEditorList"></div>
+    <div class="admin-actions">
+      <button id="addPlanetBtn" class="btn">Agregar planeta</button>
+      <button id="saveAdminBtn" class="btn">Guardar cambios</button>
+      <button id="adminLogoutBtn" class="btn">Cerrar sesión</button>
+    </div>
+    <div id="adminStatus" role="status"></div>
+    <p class="admin-note">Este acceso guarda cambios solo en este navegador. No es una protección segura para publicar el archivo en internet.</p>
+  </div>
+</div>
+
+<!-- Mensaje de entrada -->
+<div id="intro" class="overlay show">
+  <div class="card">
+    <p id="introText"></p>
+    <button id="startBtn" class="btn">Comenzar el recorrido</button>
+  </div>
+</div>
+
+<!-- Pista de cada planeta -->
+<div id="modal" class="overlay" role="dialog" aria-modal="true" aria-labelledby="mTitle">
+  <div class="card" id="modalCard">
+    <button id="close" aria-label="Cerrar">×</button>
+    <h2 id="mTitle"></h2>
+    <p id="mClue"></p>
+    <div id="mCode">
+      <div class="codeLabel">Cuando llegues, en la carta encontrarás un código. Escríbelo aquí:</div>
+      <div class="codeRow">
+        <input id="codeInput" type="text" inputmode="numeric" autocomplete="off" maxlength="12" aria-label="Código de la carta">
+        <button id="codeBtn" class="btn">Abrir</button>
+      </div>
+    </div>
+    <div id="msg" aria-live="polite"></div>
+  </div>
+</div>
+
+<!-- Final con rosas -->
+<div id="finale">
+  <canvas id="roses"></canvas>
+  <div id="finalMsg">
+    <h2 id="finalTitle"></h2>
+    <p id="finalText"></p>
+  </div>
+  <button id="back" class="btn">Volver al universo</button>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+/* =====================================================================
+   ✏️  AQUÍ EDITAS TODO EL CONTENIDO
+   ===================================================================== */
+
+// Mensaje que aparece al entrar
+const DEFAULT_INTRO_MESSAGE =
+  "Hola mi niña se que ahorita no estámos del todo bien, y me cuesta algo decirte lo mucho que te amo, " +
+  "y lo doloroso que fue perderte, así que pensé como podría recordarte lo mucho que te amo?, " +
+  "así que hice este recorrido para recordarte lo mucho que te amo.";
+
+// Mensaje final (cámbialo por el que tú quieras)
+const DEFAULT_FINAL_TITLE = "Lo lograste, mi niña";
+const DEFAULT_FINAL_MESSAGE =
+  "Cada lugar de este recorrido guarda un pedacito de lo que hemos vivido en estos cuatro años, " +
+  "y cada carta, un pedacito de lo que siento por ti. Si llegaste hasta aquí, quiero que sepas " +
+  "que sigues siendo el centro de mi universo. Te amo, hoy y siempre.";
+
+// Una entrada por planeta. El "code" es el número que estará en la carta de ese lugar:
+// al escribirlo bien, se desbloquea el siguiente planeta.
+// El código del ÚLTIMO planeta lanza el mensaje final con las rosas.
+// Para agregar más pistas, copia un bloque y cambia los datos.
+const DEFAULT_PLANETS = [
+  {
+    title: "Pista 1",
+    clue: "Todo inicia en el día que nos conocimos… más bien, en el lugar donde nos sentábamos.",
+    code: "1111",
+    color: "#ff7aa2", size: 1.5, dist: 12, speed: 0.10, ring: false
+  },
+  {
+    title: "Pista 2",
+    clue: "Donde ganas es tumbar los obstáculos con una bola pesada y tres agujeros.",
+    code: "2222",
+    color: "#7ab8ff", size: 1.8, dist: 18, speed: 0.075, ring: true
+  },
+  {
+    title: "Pista 3",
+    clue: "Holaa, ahora nos tendremos que mover algo retirado. ¿Recuerdas dónde hiciste tu bolsa de tini? " +
+          "¿Donde comimos chilaquiles que sabían 2/3?",
+    code: "3333",
+    color: "#ffd07a", size: 1.6, dist: 24, speed: 0.06, ring: false
+  }
+  // { title:"Pista 4", clue:"...", code:"4444", color:"#b69aff", size:1.7, dist:30, speed:0.05, ring:false },
+];
+
+/* =====================================================================
+   Utilidades
+   ===================================================================== */
+const $ = id => document.getElementById(id);
+const clamp = (v, a = 0, b = 1) => Math.min(b, Math.max(a, v));
+const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const KEY = 'universo_progreso_v1';
+const CONTENT_KEY = 'universo_contenido_v1';
+const ADMIN_KEY = 'universo_admin_password_v1';
+function loadContent() {
+  try {
+    const raw = localStorage.getItem(CONTENT_KEY);
+    if (!raw) return null;
+    const saved = JSON.parse(raw);
+    if (!saved || typeof saved !== 'object' || !Array.isArray(saved.planets) || !saved.planets.length) {
+      throw new Error('El contenido guardado no tiene un formato válido.');
+    }
+    const planets = saved.planets.map((p, i) => {
+      if (!p || typeof p.title !== 'string' || typeof p.clue !== 'string' || !/^\d+$/.test(String(p.code))) {
+        throw new Error(`La configuración del planeta ${i + 1} está incompleta.`);
+      }
+      return {
+        title: p.title, clue: p.clue, code: String(p.code),
+        color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : DEFAULT_PLANETS[i % DEFAULT_PLANETS.length].color,
+        size: Number.isFinite(p.size) ? clamp(p.size, 1, 2.5) : 1.6,
+        dist: Number.isFinite(p.dist) ? Math.max(12, p.dist) : 12 + i * 6,
+        speed: Number.isFinite(p.speed) ? clamp(p.speed, .02, .2) : Math.max(.035, .1 - i * .01),
+        ring: Boolean(p.ring)
+      };
+    });
+    return {
+      intro: typeof saved.intro === 'string' ? saved.intro : DEFAULT_INTRO_MESSAGE,
+      finalTitle: typeof saved.finalTitle === 'string' ? saved.finalTitle : DEFAULT_FINAL_TITLE,
+      finalMessage: typeof saved.finalMessage === 'string' ? saved.finalMessage : DEFAULT_FINAL_MESSAGE,
+      planets
+    };
+  } catch (error) {
+    console.error('No se pudo leer el contenido guardado:', error);
+    return null;
+  }
+}
+const savedContent = loadContent();
+let INTRO_MESSAGE = savedContent ? savedContent.intro : DEFAULT_INTRO_MESSAGE;
+let FINAL_TITLE = savedContent ? savedContent.finalTitle : DEFAULT_FINAL_TITLE;
+let FINAL_MESSAGE = savedContent ? savedContent.finalMessage : DEFAULT_FINAL_MESSAGE;
+let PLANETS = savedContent ? savedContent.planets : DEFAULT_PLANETS.map(p => ({ ...p }));
+let N = PLANETS.length;
+if (location.search.includes('reset')) { try { localStorage.removeItem(KEY); } catch (e) {} }
+let done = 0;
+try { done = clamp(parseInt(localStorage.getItem(KEY) || '0', 10) || 0, 0, N); } catch (e) {}
+function saveProgress() { try { localStorage.setItem(KEY, String(done)); } catch (e) {} }
+
+function typeText(el, text, speed, cb) {
+  let i = 0; el.textContent = '';
+  const id = setInterval(() => {
+    el.textContent = text.slice(0, ++i);
+    if (i >= text.length) { clearInterval(id); cb && cb(); }
+  }, speed);
+  return id;
+}
+
+/* =====================================================================
+   Universo 3D
+   ===================================================================== */
+const cv = $('scene');
+const renderer = new THREE.WebGLRenderer({ canvas: cv, antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(55, 1, 0.1, 1200);
+
+function glowTexture(inner, outer) {
+  const c = document.createElement('canvas'); c.width = c.height = 256;
+  const x = c.getContext('2d');
+  const g = x.createRadialGradient(128, 128, 0, 128, 128, 128);
+  g.addColorStop(0, inner); g.addColorStop(.35, outer); g.addColorStop(1, 'rgba(0,0,0,0)');
+  x.fillStyle = g; x.fillRect(0, 0, 256, 256);
+  return new THREE.CanvasTexture(c);
+}
+function glowSprite(inner, outer, scale, opacity = 1) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture(inner, outer), blending: THREE.AdditiveBlending, depthWrite: false, transparent: true, opacity
+  }));
+  s.scale.set(scale, scale, 1); return s;
+}
+
+// Estrellas (dos capas)
+function stars(count, rMin, rMax, size) {
+  const pos = new Float32Array(count * 3), col = new Float32Array(count * 3);
+  for (let i = 0; i < count; i++) {
+    const r = rMin + Math.random() * (rMax - rMin);
+    const th = Math.random() * Math.PI * 2, ph = Math.acos(2 * Math.random() - 1);
+    pos[i * 3] = r * Math.sin(ph) * Math.cos(th);
+    pos[i * 3 + 1] = r * Math.cos(ph);
+    pos[i * 3 + 2] = r * Math.sin(ph) * Math.sin(th);
+    const warm = Math.random();
+    col[i * 3] = 0.8 + 0.2 * warm; col[i * 3 + 1] = 0.75 + 0.15 * Math.random(); col[i * 3 + 2] = 0.9 - 0.2 * warm;
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('color', new THREE.BufferAttribute(col, 3));
+  return new THREE.Points(g, new THREE.PointsMaterial({ size, vertexColors: true, sizeAttenuation: false, transparent: true, opacity: .9, depthWrite: false }));
+}
+const starsA = stars(1800, 200, 600, 1.4);
+const starsB = stars(500, 150, 400, 2.4);
+scene.add(starsA, starsB);
+
+// Nebulosas lejanas
+[[-160, 40, -220, 'rgba(255,120,170,.35)', 420], [200, -60, -260, 'rgba(120,100,255,.30)', 480], [30, 90, 260, 'rgba(255,170,90,.18)', 380]]
+  .forEach(([x, y, z, c, s]) => { const n = glowSprite(c, 'rgba(0,0,0,0)', s, .8); n.position.set(x, y, z); scene.add(n); });
+
+// Sol
+function sunTexture() {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const x = c.getContext('2d');
+  const g = x.createLinearGradient(0, 0, 0, 256);
+  g.addColorStop(0, '#ff9a2e'); g.addColorStop(.5, '#ffd25a'); g.addColorStop(1, '#ff8a2a');
+  x.fillStyle = g; x.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 260; i++) {
+    x.fillStyle = Math.random() < .5 ? 'rgba(255,240,170,.16)' : 'rgba(210,70,0,.14)';
+    x.beginPath(); x.arc(Math.random() * 512, Math.random() * 256, 4 + Math.random() * 26, 0, 7); x.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+const sun = new THREE.Mesh(new THREE.SphereGeometry(4, 48, 48), new THREE.MeshBasicMaterial({ map: sunTexture() }));
+scene.add(sun);
+[[ 'rgba(255,230,160,1)', 'rgba(255,150,40,.55)', 22, 1 ],
+ [ 'rgba(255,170,70,.6)', 'rgba(255,90,40,.25)', 40, .8 ],
+ [ 'rgba(255,120,120,.25)', 'rgba(180,40,120,.12)', 80, .7 ]]
+  .forEach(a => scene.add(glowSprite(...a)));
+scene.add(new THREE.PointLight(0xffdca8, 1.8, 0));
+scene.add(new THREE.AmbientLight(0x4a3a66, 0.75));
+
+// Planetas
+function planetTexture(base) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 256;
+  const x = c.getContext('2d');
+  x.fillStyle = base; x.fillRect(0, 0, 512, 256);
+  for (let i = 0; i < 70; i++) {
+    x.fillStyle = `rgba(${Math.random() < .5 ? '255,255,255' : '0,0,0'},${Math.random() * .13})`;
+    x.fillRect(0, Math.random() * 256, 512, 2 + Math.random() * 16);
+  }
+  for (let i = 0; i < 28; i++) {
+    x.fillStyle = `rgba(255,255,255,${Math.random() * .08})`;
+    x.beginPath(); x.arc(Math.random() * 512, Math.random() * 256, 5 + Math.random() * 30, 0, 7); x.fill();
+  }
+  return new THREE.CanvasTexture(c);
+}
+const planets = [];
+const labelsEl = $('labels');
+function createPlanet(p, i) {
+  const pivot = new THREE.Group();
+  pivot.rotation.x = (i % 2 ? -1 : 1) * 0.12;
+  pivot.rotation.z = (i - 1) * 0.05;
+  pivot.userData.angle = Math.random() * Math.PI * 2;
+  scene.add(pivot);
+
+  const mat = new THREE.MeshStandardMaterial({ map: planetTexture(p.color), roughness: .85, metalness: 0 });
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(p.size, 40, 40), mat);
+  mesh.position.x = p.dist; mesh.userData.i = i;
+  pivot.add(mesh);
+
+  const halo = glowSprite(p.color, 'rgba(0,0,0,0)', p.size * 5, .6);
+  mesh.add(halo);
+
+  if (p.ring) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(p.size * 1.5, p.size * 2.3, 64),
+      new THREE.MeshBasicMaterial({ color: 0xf5d38a, side: THREE.DoubleSide, transparent: true, opacity: .45 }));
+    ring.rotation.x = Math.PI / 2.3; mesh.add(ring);
+  }
+
+  // Órbita
+  const pts = []; for (let k = 0; k <= 128; k++) { const a = k / 128 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * p.dist, 0, Math.sin(a) * p.dist)); }
+  const orbit = new THREE.LineLoop(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color: 0xffffff, transparent: true, opacity: .12 }));
+  pivot.add(orbit);
+
+  const lbl = document.createElement('div'); lbl.className = 'lbl'; labelsEl.appendChild(lbl);
+  planets.push({ pivot, mesh, halo, mat, lbl, cfg: p });
+}
+function rebuildPlanets() {
+  planets.forEach(pl => {
+    scene.remove(pl.pivot);
+    pl.pivot.traverse(obj => {
+      if (obj.geometry) obj.geometry.dispose();
+      if (obj.material) {
+        const materials = Array.isArray(obj.material) ? obj.material : [obj.material];
+        materials.forEach(material => {
+          if (material.map) material.map.dispose();
+          material.dispose();
+        });
+      }
+    });
+    pl.lbl.remove();
+  });
+  planets.length = 0;
+  PLANETS.forEach(createPlanet);
+}
+rebuildPlanets();
+
+function refreshStates() {
+  planets.forEach((pl, i) => {
+    const locked = i > done, open = i === done, fin = i < done;
+    pl.mat.color.set(locked ? 0x5d5a78 : 0xffffff);
+    pl.mat.emissive.set(fin ? 0x2a1c08 : 0x000000);
+    pl.halo.material.opacity = locked ? .12 : fin ? .45 : .8;
+    pl.lbl.className = 'lbl ' + (locked ? 'locked' : open ? 'open' : 'done');
+    pl.lbl.textContent = (locked ? '🔒 ' : fin ? '✓ ' : '✦ ') + pl.cfg.title;
+  });
+  $('progress').textContent = `Pistas ${done} / ${N}`;
+  $('btnFinal').style.display = done >= N ? 'inline-block' : 'none';
+}
+
+/* Cámara: arrastrar para girar, rueda/pellizco para acercar */
+let th = 0.6, ph = 1.15, rad = 34;
+let cth = th, cph = ph, crad = 110;
+let idle = 0;
+const maxCameraRad = () => Math.max(80, PLANETS[PLANETS.length - 1].dist + 14);
+const ptrs = new Map(); let moved = 0, downT = 0, pinchD = 0;
+const pdist = () => { const a = [...ptrs.values()]; return Math.hypot(a[0].x - a[1].x, a[0].y - a[1].y) || 1; };
+
+cv.addEventListener('pointerdown', e => {
+  cv.setPointerCapture(e.pointerId);
+  ptrs.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  moved = 0; downT = performance.now(); idle = 0;
+  if (ptrs.size === 2) pinchD = pdist();
+});
+cv.addEventListener('pointermove', e => {
+  const p = ptrs.get(e.pointerId);
+  if (!p) { hover(e); return; }
+  const dx = e.clientX - p.x, dy = e.clientY - p.y;
+  p.x = e.clientX; p.y = e.clientY; moved += Math.abs(dx) + Math.abs(dy); idle = 0;
+  if (ptrs.size === 1) { th -= dx * .005; ph = clamp(ph - dy * .005, .3, Math.PI - .3); }
+  else if (ptrs.size === 2) { const d = pdist(); rad = clamp(rad * pinchD / d, 12, maxCameraRad()); pinchD = d; }
+});
+const release = e => {
+  if (!ptrs.has(e.pointerId)) return;
+  ptrs.delete(e.pointerId);
+  if (ptrs.size === 0 && moved < 8 && performance.now() - downT < 500) pick(e);
+};
+cv.addEventListener('pointerup', release);
+cv.addEventListener('pointercancel', e => ptrs.delete(e.pointerId));
+cv.addEventListener('wheel', e => { e.preventDefault(); rad = clamp(rad * Math.exp(e.deltaY * .001), 12, maxCameraRad()); idle = 0; }, { passive: false });
+
+const ray = new THREE.Raycaster(), mouse = new THREE.Vector2();
+function hit(e) {
+  mouse.set(e.clientX / innerWidth * 2 - 1, -(e.clientY / innerHeight) * 2 + 1);
+  ray.setFromCamera(mouse, camera);
+  // Radio de impacto generoso para tocar fácil en el celular
+  let best = null, bd = 1e9;
+  planets.forEach(pl => {
+    const wp = pl.mesh.getWorldPosition(new THREE.Vector3());
+    const d = ray.ray.distanceToPoint(wp), lim = pl.cfg.size * 1.6;
+    const along = wp.distanceTo(camera.position);
+    if (d < lim && along < bd) { best = pl; bd = along; }
+  });
+  return best;
+}
+function hover(e) { cv.style.cursor = hit(e) ? 'pointer' : 'grab'; }
+function pick(e) { const pl = hit(e); if (pl) openModal(planets.indexOf(pl)); }
+
+function resize() {
+  renderer.setSize(innerWidth, innerHeight, false);
+  camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+  const mobile = innerWidth < 600;
+  camera.fov = mobile ? 90 : 55;
+  rad = mobile ? Math.max(rad, 64) : Math.min(rad, 34);
+  rad = Math.min(rad, maxCameraRad());
+  camera.updateProjectionMatrix();
+}
+addEventListener('resize', resize); resize();
+
+const clock = new THREE.Clock(), v = new THREE.Vector3();
+function loop() {
+  requestAnimationFrame(loop);
+  const dt = Math.min(clock.getDelta(), .05), t = clock.elapsedTime;
+  idle += dt;
+  if (idle > 3 && ptrs.size === 0) th += dt * 0.05;
+  cth += (th - cth) * .08; cph += (ph - cph) * .08; crad += (rad - crad) * .05;
+  camera.position.set(crad * Math.sin(cph) * Math.sin(cth), crad * Math.cos(cph), crad * Math.sin(cph) * Math.cos(cth));
+  camera.lookAt(0, 0, 0);
+
+  sun.rotation.y += dt * .08;
+  starsA.rotation.y += dt * .004; starsB.rotation.y -= dt * .003;
+
+  planets.forEach((pl, i) => {
+    pl.pivot.userData.angle += dt * pl.cfg.speed;
+    pl.pivot.rotation.y = pl.pivot.userData.angle;
+    pl.mesh.rotation.y += dt * .4;
+    if (i === done) { const s = pl.cfg.size * (5 + Math.sin(t * 3) * 1.1); pl.halo.scale.set(s, s, 1); }
+    // etiqueta
+    pl.mesh.getWorldPosition(v); v.y += pl.cfg.size + 0.9; v.project(camera);
+    const vis = v.z < 1;
+    pl.lbl.style.display = vis ? 'block' : 'none';
+    pl.lbl.style.left = (v.x * .5 + .5) * innerWidth + 'px';
+    pl.lbl.style.top = (-v.y * .5 + .5) * innerHeight + 'px';
+  });
+  renderer.render(scene, camera);
+}
+refreshStates();
+loop();
+
+/* =====================================================================
+   Intro, pistas y códigos
+   ===================================================================== */
+let introTimer = typeText($('introText'), INTRO_MESSAGE, 38, () => $('startBtn').classList.add('ready'));
+$('startBtn').onclick = () => {
+  $('intro').classList.remove('show'); rad = 32; idle = 0;
+  setTimeout(() => openModal(Math.min(done, N - 1)), 700);
+};
+// Tocar el texto lo muestra completo
+$('introText').onclick = () => { clearInterval(introTimer); $('introText').textContent = INTRO_MESSAGE; $('startBtn').classList.add('ready'); };
+
+let current = 0;
+function setMsg(text, cls) { const m = $('msg'); m.textContent = text; m.className = cls || ''; }
+function openModal(i) {
+  current = i;
+  const p = PLANETS[i];
+  $('mTitle').textContent = p.title;
+  setMsg('');
+  $('codeInput').value = '';
+  if (i > done) {
+    $('mClue').textContent = 'Este planeta todavía está dormido. Primero completa la pista anterior.';
+    $('mCode').style.display = 'none';
+  } else if (i < done) {
+    $('mClue').textContent = p.clue;
+    $('mCode').style.display = 'none';
+    setMsg('✓ Esta pista ya la completaste.', 'good');
+  } else {
+    $('mClue').textContent = p.clue;
+    $('mCode').style.display = 'block';
+    const configured = /^\d+$/.test(String(p.code));
+    $('codeInput').disabled = !configured;
+    $('codeBtn').disabled = !configured;
+    if (!configured) setMsg('Este código aún está por configurar en PLANETS, con el número de la carta.', 'bad');
+  }
+  $('modal').classList.add('show');
+  if (i === done) setTimeout(() => $('codeInput').focus({ preventScroll: true }), 50);
+}
+function closeModal() { $('modal').classList.remove('show'); }
+$('close').onclick = closeModal;
+$('modal').addEventListener('pointerdown', e => { if (e.target === $('modal')) closeModal(); });
+addEventListener('keydown', e => {
+  if (e.key !== 'Escape') return;
+  closeModal();
+  $('adminLogin').classList.remove('show');
+  $('adminPanel').classList.remove('show');
+});
+
+function submitCode() {
+  if (current !== done) return;
+  if (!/^\d+$/.test(String(PLANETS[current].code))) {
+    setMsg('Este código aún está por configurar en PLANETS, con el número de la carta.', 'bad');
+    return;
+  }
+  const typed = $('codeInput').value.replace(/\s+/g, '');
+  if (typed === String(PLANETS[current].code).replace(/\s+/g, '')) {
+    done++; saveProgress(); refreshStates();
+    if (done >= N) { closeModal(); setTimeout(startFinale, 500); return; }
+    setMsg('✨ ¡Código correcto! Se despertó un nuevo planeta.', 'good');
+    setTimeout(() => openModal(done), 1400);
+  } else {
+    setMsg('Ese código no es el correcto. Revisa bien la carta, mi niña 💛', 'bad');
+    const c = $('modalCard'); c.classList.remove('shake'); void c.offsetWidth; c.classList.add('shake');
+  }
+}
+$('codeBtn').onclick = submitCode;
+$('codeInput').addEventListener('keydown', e => { if (e.key === 'Enter') submitCode(); });
+$('btnFinal').onclick = startFinale;
+
+/* =====================================================================
+   Administración local del contenido
+   ===================================================================== */
+let adminDraftPlanets = [];
+function openAdminLogin() {
+  $('adminLoginStatus').textContent = '';
+  $('adminPassword').value = '';
+  let configured = false;
+  try { configured = Boolean(localStorage.getItem(ADMIN_KEY)); }
+  catch (error) {
+    $('adminLoginStatus').textContent = 'No se pudo acceder al almacenamiento del navegador.';
+    console.error('No se pudo consultar la contraseña de administrador:', error);
+  }
+  $('adminLoginHelp').textContent = configured
+    ? 'Inicia sesión para editar las pistas, pruebas y mensajes.'
+    : 'Primera vez: crea una contraseña de al menos 6 caracteres. La necesitarás para volver a administrar.';
+  $('adminLoginBtn').textContent = configured ? 'Entrar' : 'Crear acceso';
+  $('adminPassword').autocomplete = configured ? 'current-password' : 'new-password';
+  $('adminLogin').classList.add('show');
+  setTimeout(() => $('adminPassword').focus({ preventScroll: true }), 50);
+}
+function addEditorField(parent, caption, value, field, multiline) {
+  const label = document.createElement('label');
+  label.textContent = caption;
+  const input = document.createElement(multiline ? 'textarea' : 'input');
+  input.value = value;
+  input.dataset.field = field;
+  input.setAttribute('aria-label', caption);
+  input.addEventListener('input', () => { adminDraftPlanets[input.dataset.index][field] = input.value; });
+  parent.append(label, input);
+  return input;
+}
+function renderPlanetEditor() {
+  const list = $('planetEditorList');
+  list.replaceChildren();
+  adminDraftPlanets.forEach((p, i) => {
+    const card = document.createElement('section');
+    card.className = 'planet-editor';
+    const heading = document.createElement('h3');
+    heading.textContent = `Planeta ${i + 1}`;
+    card.appendChild(heading);
+    const title = addEditorField(card, 'Nombre', p.title, 'title', false);
+    const clue = addEditorField(card, 'Pista', p.clue, 'clue', true);
+    const code = addEditorField(card, 'Respuesta / código numérico', p.code, 'code', false);
+    [title, clue, code].forEach(input => { input.dataset.index = i; });
+    code.inputMode = 'numeric';
+    code.maxLength = 12;
+    const remove = document.createElement('button');
+    remove.className = 'btn';
+    remove.type = 'button';
+    remove.textContent = 'Eliminar planeta';
+    remove.addEventListener('click', () => {
+      adminDraftPlanets.splice(i, 1);
+      renderPlanetEditor();
+    });
+    card.appendChild(remove);
+    list.appendChild(card);
+  });
+}
+function openAdminPanel() {
+  $('editIntro').value = INTRO_MESSAGE;
+  $('editFinalTitle').value = FINAL_TITLE;
+  $('editFinalMessage').value = FINAL_MESSAGE;
+  adminDraftPlanets = PLANETS.map(p => ({ ...p }));
+  renderPlanetEditor();
+  $('adminStatus').textContent = '';
+  $('adminPanel').classList.add('show');
+}
+function newPlanet(index) {
+  return {
+    title: `Pista ${index + 1}`, clue: '', code: '',
+    color: ['#ff7aa2', '#7ab8ff', '#ffd07a', '#b69aff', '#7de0c3'][index % 5],
+    size: 1.6, dist: 12 + index * 6, speed: Math.max(.035, .1 - index * .01), ring: index % 2 === 1
+  };
+}
+$('adminBtn').onclick = openAdminLogin;
+$('adminLoginCancel').onclick = () => $('adminLogin').classList.remove('show');
+$('adminLoginBtn').onclick = () => {
+  const password = $('adminPassword').value;
+  if (password.length < 6) {
+    $('adminLoginStatus').textContent = 'La contraseña debe tener al menos 6 caracteres.';
+    return;
+  }
+  try {
+    const stored = localStorage.getItem(ADMIN_KEY);
+    if (stored && stored !== password) {
+      $('adminLoginStatus').textContent = 'Contraseña incorrecta.';
+      return;
+    }
+    if (!stored) localStorage.setItem(ADMIN_KEY, password);
+  } catch (error) {
+    $('adminLoginStatus').textContent = 'No se pudo guardar o leer la contraseña en este navegador.';
+    console.error('No se pudo completar el acceso de administrador:', error);
+    return;
+  }
+  $('adminLogin').classList.remove('show');
+  openAdminPanel();
+};
+$('adminPassword').addEventListener('keydown', e => { if (e.key === 'Enter') $('adminLoginBtn').click(); });
+$('addPlanetBtn').onclick = () => {
+  adminDraftPlanets.push(newPlanet(adminDraftPlanets.length));
+  renderPlanetEditor();
+  $('planetEditorList').lastElementChild.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+};
+$('saveAdminBtn').onclick = () => {
+  const intro = $('editIntro').value.trim();
+  const finalTitle = $('editFinalTitle').value.trim();
+  const finalMessage = $('editFinalMessage').value.trim();
+  if (!intro || !finalTitle || !finalMessage) {
+    $('adminStatus').textContent = 'Completa los tres mensajes antes de guardar.';
+    return;
+  }
+  if (!adminDraftPlanets.length || adminDraftPlanets.some(p =>
+    !p.title.trim() || !p.clue.trim() || !/^\d+$/.test(String(p.code).trim()))) {
+    $('adminStatus').textContent = 'Cada planeta debe tener nombre, pista y una respuesta numérica.';
+    return;
+  }
+  const planetsChanged = JSON.stringify(PLANETS.map(({ title, clue, code }) => ({ title, clue, code }))) !==
+    JSON.stringify(adminDraftPlanets.map(({ title, clue, code }) => ({ title: title.trim(), clue: clue.trim(), code: String(code).trim() })));
+  const planets = adminDraftPlanets.map(p => ({
+    ...p, title: p.title.trim(), clue: p.clue.trim(), code: String(p.code).trim()
+  }));
+  try {
+    localStorage.setItem(CONTENT_KEY, JSON.stringify({ intro, finalTitle, finalMessage, planets }));
+    INTRO_MESSAGE = intro;
+    FINAL_TITLE = finalTitle;
+    FINAL_MESSAGE = finalMessage;
+    PLANETS = planets;
+    N = PLANETS.length;
+    if (planetsChanged) { done = 0; saveProgress(); }
+    rebuildPlanets();
+    refreshStates();
+    clearInterval(introTimer);
+    $('introText').textContent = INTRO_MESSAGE;
+    $('startBtn').classList.add('ready');
+    closeModal();
+    $('adminStatus').textContent = 'Cambios guardados en este navegador.';
+  } catch (error) {
+    $('adminStatus').textContent = 'No se pudieron guardar los cambios. Revisa el almacenamiento del navegador.';
+    console.error('No se pudieron guardar los cambios del universo:', error);
+  }
+};
+$('adminLogoutBtn').onclick = () => {
+  $('adminPanel').classList.remove('show');
+};
+$('adminPanel').addEventListener('click', e => {
+  if (e.target === $('adminPanel')) {
+    $('adminPanel').classList.remove('show');
+  }
+});
+
+/* =====================================================================
+   Final: rosas que se dibujan desde cero
+   ===================================================================== */
+const rc = $('roses'), rx = rc.getContext('2d');
+let RW = 0, RH = 0, finaleOn = false, finStart = 0, falling = [];
+
+function sizeRoses() {
+  const d = Math.min(devicePixelRatio, 2);
+  RW = innerWidth; RH = innerHeight;
+  rc.width = RW * d; rc.height = RH * d;
+  rx.setTransform(d, 0, 0, d, 0, 0);
+}
+addEventListener('resize', () => { if (finaleOn) sizeRoses(); });
+
+// Colores por anillo de pétalos (de afuera hacia el centro): base, medio, borde
+const RING_COLORS = [
+  ['#6e0a22', '#d4294a', '#ff8fa6'],
+  ['#650a20', '#c9223f', '#f97b95'],
+  ['#5a081c', '#b81c38', '#ee6a86'],
+  ['#4d0618', '#a01632', '#dd5a78'],
+  ['#3f0414', '#8c102a', '#c94868']
+];
+const RING_DEF = [ // n pétalos, tamaño relativo, desfase
+  { n: 6, r: 1.00, off: 0.0 }, { n: 5, r: .84, off: .55 }, { n: 5, r: .66, off: .25 },
+  { n: 4, r: .48, off: .9 }, { n: 3, r: .30, off: .2 }
+];
+
+function petalPath(c, L, W) {
+  c.beginPath();
+  c.moveTo(0, 0);
+  c.bezierCurveTo(-W * .55, L * .15, -W * 1.15, L * .75, -W * .35, L * .97);
+  c.quadraticCurveTo(0, L * 1.04, W * .35, L * .97);
+  c.bezierCurveTo(W * 1.15, L * .75, W * .55, L * .15, 0, 0);
+  c.closePath();
+}
+
+function drawPetal(c, L, W, colors, ringIdx) {
+  // sombra bajo el pétalo para dar profundidad
+  c.save();
+  c.shadowColor = 'rgba(0,0,0,.45)'; c.shadowBlur = L * .12; c.shadowOffsetY = L * .03;
+  const g = c.createLinearGradient(0, 0, 0, L);
+  g.addColorStop(0, colors[0]); g.addColorStop(.55, colors[1]); g.addColorStop(1, colors[2]);
+  c.fillStyle = g; petalPath(c, L, W); c.fill();
+  c.restore();
+  // venas
+  c.strokeStyle = 'rgba(50,0,12,.28)'; c.lineWidth = Math.max(.5, L * .01);
+  for (let k = -1; k <= 1; k++) {
+    c.beginPath(); c.moveTo(0, L * .05);
+    c.quadraticCurveTo(k * W * .35, L * .5, k * W * .55, L * .9); c.stroke();
+  }
+  // brillo suave en el borde del pétalo
+  c.save(); petalPath(c, L, W); c.clip();
+  const h = c.createRadialGradient(0, L * 1.02, 0, 0, L * 1.02, L * .35);
+  h.addColorStop(0, 'rgba(255,225,232,.55)'); h.addColorStop(1, 'rgba(255,225,232,0)');
+  c.fillStyle = h; c.fillRect(-W * 1.3, 0, W * 2.6, L * 1.1);
+  c.restore();
+  c.strokeStyle = 'rgba(255,190,205,.35)'; c.lineWidth = Math.max(.6, L * .012);
+  petalPath(c, L, W); c.stroke();
+}
+
+function leaf(c, x, y, len, ang) {
+  c.save(); c.translate(x, y); c.rotate(ang);
+  const g = c.createLinearGradient(0, 0, len, 0);
+  g.addColorStop(0, '#0f4d2a'); g.addColorStop(1, '#3fae6a');
+  c.fillStyle = g;
+  c.beginPath(); c.moveTo(0, 0);
+  c.bezierCurveTo(len * .3, -len * .38, len * .75, -len * .3, len, 0);
+  c.bezierCurveTo(len * .75, len * .3, len * .3, len * .38, 0, 0); c.fill();
+  c.strokeStyle = 'rgba(210,255,220,.35)'; c.lineWidth = 1;
+  c.beginPath(); c.moveTo(0, 0); c.lineTo(len * .92, 0); c.stroke();
+  c.restore();
+}
+
+function drawBloom(c, R, p) {
+  // sépalos verdes bajo la flor
+  const sp = ease(clamp(p / .35));
+  for (let k = 0; k < 5; k++) {
+    c.save(); c.rotate(k * Math.PI * 2 / 5 + .3);
+    leaf(c, 0, 0, R * .75 * sp, Math.PI / 2 + .25); c.restore();
+  }
+  // anillos de pétalos: primero los de afuera (quedan detrás)
+  RING_DEF.forEach((rg, k) => {
+    const start = (RING_DEF.length - 1 - k) * .1;
+    const s = ease(clamp((p - start) / .5));
+    if (s <= 0) return;
+    for (let j = 0; j < rg.n; j++) {
+      c.save();
+      const a = rg.off + j * Math.PI * 2 / rg.n + k * .35 + (1 - s) * .5;
+      c.rotate(a);
+      const L = R * rg.r * (.35 + .65 * s), W = L * .62;
+      drawPetal(c, L, W, RING_COLORS[k], k);
+      c.restore();
+    }
+  });
+  // espiral del centro
+  const cs = ease(clamp((p - .1) / .5));
+  if (cs > 0) {
+    const g = c.createRadialGradient(0, 0, 0, 0, 0, R * .22);
+    g.addColorStop(0, '#2c020d'); g.addColorStop(1, 'rgba(120,10,35,0)');
+    c.fillStyle = g; c.beginPath(); c.arc(0, 0, R * .22 * cs, 0, 7); c.fill();
+    c.strokeStyle = 'rgba(255,170,190,.45)'; c.lineWidth = Math.max(.8, R * .012);
+    for (let k = 0; k < 4; k++) {
+      c.beginPath(); c.arc(0, 0, R * (.05 + .04 * k) * cs, k * 1.6, k * 1.6 + Math.PI * 1.35); c.stroke();
+    }
+  }
+  // gotas de rocío al final
+  const dp = clamp((p - .85) / .15);
+  if (dp > 0) {
+    [[-.42, .3, .035], [.3, .5, .03], [.12, -.52, .028], [-.15, -.2, .022]].forEach(([dx, dy, dr]) => {
+      const x = dx * R, y = dy * R, r = dr * R * dp;
+      c.fillStyle = `rgba(255,255,255,${.28 * dp})`; c.beginPath(); c.arc(x, y, r, 0, 7); c.fill();
+      c.fillStyle = `rgba(255,255,255,${.9 * dp})`; c.beginPath(); c.arc(x - r * .3, y - r * .3, r * .35, 0, 7); c.fill();
+    });
+  }
+}
+
+function drawRoseWithStem(c, x, baseY, H, R, t) {
+  const stemP = ease(clamp(t / 2.2));
+  const bloomP = clamp((t - 1.4) / 5.5);
+  if (stemP <= 0) return;
+  const sx = u => x + Math.sin(u * Math.PI * 1.3) * H * .045;
+  const sy = u => baseY - u * H;
+  // tallo
+  c.save(); c.lineCap = 'round';
+  c.strokeStyle = '#1a6b3b'; c.lineWidth = Math.max(3, R * .11);
+  c.beginPath(); c.moveTo(sx(0), sy(0));
+  for (let u = 0; u <= stemP; u += .02) c.lineTo(sx(u), sy(u));
+  c.stroke();
+  c.strokeStyle = 'rgba(160,255,190,.25)'; c.lineWidth = Math.max(1, R * .03); c.stroke();
+  c.restore();
+  // hojas y espinas
+  [[.32, 1], [.52, -1], [.7, 1]].forEach(([u, side]) => {
+    const lp = clamp((stemP - u) / .15 + (bloomP > 0 ? .3 : 0));
+    if (lp > 0) leaf(c, sx(u), sy(u), R * 1.15 * ease(clamp(lp)), side > 0 ? -.55 : Math.PI + .55);
+    if (stemP > u + .1) {
+      c.fillStyle = '#0d4a28'; c.beginPath();
+      c.moveTo(sx(u + .08) - 2, sy(u + .08)); c.lineTo(sx(u + .08) + side * R * .12, sy(u + .08) + R * .06); c.lineTo(sx(u + .08) + 2, sy(u + .08) + 3); c.fill();
+    }
+  });
+  // flor
+  if (bloomP > 0) {
+    c.save(); c.translate(sx(stemP), sy(stemP));
+    const glow = c.createRadialGradient(0, 0, 0, 0, 0, R * 1.6);
+    glow.addColorStop(0, `rgba(255,90,120,${.28 * bloomP})`); glow.addColorStop(1, 'rgba(255,90,120,0)');
+    c.fillStyle = glow; c.beginPath(); c.arc(0, 0, R * 1.6, 0, 7); c.fill();
+    drawBloom(c, R, bloomP);
+    c.restore();
+  } else {
+    // capullo mientras sube el tallo
+    c.save(); c.translate(sx(stemP), sy(stemP));
+    c.fillStyle = '#a01632'; c.beginPath(); c.ellipse(0, -R * .15, R * .16, R * .26, 0, 0, 7); c.fill();
+    c.restore();
+  }
+}
+
+function spawnPetal() {
+  falling.push({ x: Math.random() * RW, y: -20, s: 6 + Math.random() * 9, vx: (Math.random() - .5) * 20, vy: 22 + Math.random() * 30,
+                 a: Math.random() * 6, va: (Math.random() - .5) * 2.5, ph: Math.random() * 6, c: Math.random() < .5 ? '255,140,165' : '230,60,95' });
+}
+
+let lastF = 0, msgStarted = false;
+function finaleLoop(now) {
+  if (!finaleOn) return;
+  requestAnimationFrame(finaleLoop);
+  const t = (now - finStart) / 1000, dt = Math.min((now - lastF) / 1000, .05); lastF = now;
+  rx.clearRect(0, 0, RW, RH);
+
+  const narrow = RW < 700;
+  const base = Math.min(RW, RH);
+  const defs = narrow
+    ? [[.22, .40, .15, .5], [.5, .50, .19, 0], [.78, .38, .14, 1.0]]
+    : [[.14, .38, .09, 1.0], [.32, .46, .115, .4], [.5, .55, .145, 0], [.68, .46, .115, .6], [.86, .38, .09, 1.2]];
+  // delay, x, alto del tallo, radio
+  defs.forEach(([fx, fh, fr, delay]) => drawRoseWithStem(rx, RW * fx, RH + 6, RH * fh, base * fr * (narrow ? 1.25 : 1), t - delay));
+
+  // pétalos cayendo (después de que empiezan a abrir)
+  if (t > 3 && Math.random() < dt * 5) spawnPetal();
+  falling = falling.filter(f => f.y < RH + 30);
+  falling.forEach(f => {
+    f.y += f.vy * dt; f.x += (f.vx + Math.sin(t * 1.5 + f.ph) * 18) * dt; f.a += f.va * dt;
+    rx.save(); rx.translate(f.x, f.y); rx.rotate(f.a); rx.scale(1, .65);
+    rx.fillStyle = `rgba(${f.c},.8)`; rx.beginPath(); rx.ellipse(0, 0, f.s, f.s * .6, 0, 0, 7); rx.fill(); rx.restore();
+  });
+
+  if (t > 3.5 && !msgStarted) {
+    msgStarted = true;
+    $('finalTitle').textContent = FINAL_TITLE; $('finalTitle').style.opacity = 1;
+    setTimeout(() => typeText($('finalText'), FINAL_MESSAGE, 45, () => $('back').classList.add('ready')), 1500);
+  }
+}
+
+function startFinale() {
+  closeModal();
+  $('adminBtn').style.display = 'none';
+  $('finale').classList.add('show');
+  $('finalTitle').style.opacity = 0; $('finalTitle').textContent = ''; $('finalText').textContent = '';
+  $('back').classList.remove('ready');
+  msgStarted = false; falling = []; sizeRoses();
+  finaleOn = true; finStart = lastF = performance.now();
+  requestAnimationFrame(finaleLoop);
+}
+$('back').onclick = () => {
+  finaleOn = false;
+  $('finale').classList.remove('show');
+  $('adminBtn').style.display = '';
+};
+</script>
+</body>
+</html>
