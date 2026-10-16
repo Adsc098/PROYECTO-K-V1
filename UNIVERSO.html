@@ -61,6 +61,9 @@
   #msg{min-height:22px;margin-top:12px;font:600 14px var(--sans)}
   #msg.bad{color:#ff8c9d}
   #msg.good{color:var(--gold)}
+  #clueVideo{margin-top:18px}
+  #clueVideo iframe,#clueVideo video{display:block;width:100%;max-height:60vh;aspect-ratio:16/9;border:0;border-radius:12px;background:#000}
+  #clueVideoStatus{margin-top:8px;font:12px/1.5 var(--sans);color:var(--gold)}
   .shake{animation:shake .4s}
   @keyframes shake{20%{transform:translateX(-8px)}40%{transform:translateX(8px)}60%{transform:translateX(-5px)}80%{transform:translateX(5px)}}
 
@@ -135,7 +138,7 @@
     <label for="editFinalMessage">Mensaje final</label>
     <textarea id="editFinalMessage"></textarea>
     <h2>Planetas, pistas y pruebas</h2>
-    <p class="admin-note">El código es la respuesta de cada prueba. Al cambiar los nombres, pistas, respuestas o cantidad de planetas, el recorrido se reiniciará para mantener el orden correcto.</p>
+    <p class="admin-note">El código es la respuesta de cada prueba. Puedes agregar un enlace público de YouTube o un enlace directo a un video MP4 (máximo 1 minuto) para cada pista. Al cambiar los nombres, pistas, respuestas o cantidad de planetas, el recorrido se reiniciará para mantener el orden correcto.</p>
     <div id="planetEditorList"></div>
     <div class="admin-actions">
       <button id="addPlanetBtn" class="btn">Agregar planeta</button>
@@ -161,6 +164,7 @@
     <button id="close" aria-label="Cerrar">×</button>
     <h2 id="mTitle"></h2>
     <p id="mClue"></p>
+    <div id="clueVideo" hidden></div>
     <div id="mCode">
       <div class="codeLabel">Cuando llegues, en la carta encontrarás un código. Escríbelo aquí:</div>
       <div class="codeRow">
@@ -237,6 +241,30 @@ const ease = t => t < .5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
 const KEY = 'universo_progreso_v1';
 const CONTENT_KEY = 'universo_contenido_v1';
 const ADMIN_KEY = 'universo_admin_password_v1';
+function parseVideoSource(value) {
+  if (!value) return null;
+  let url;
+  try { url = new URL(value); } catch (error) { return null; }
+  if (url.protocol !== 'https:') return null;
+
+  const host = url.hostname.toLowerCase().replace(/^www\./, '');
+  let videoId = '';
+  if (host === 'youtu.be') videoId = url.pathname.split('/').filter(Boolean)[0] || '';
+  else if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+    if (url.pathname === '/watch') videoId = url.searchParams.get('v') || '';
+    else if (/^\/(embed|shorts|live)\/[^/]+/.test(url.pathname)) videoId = url.pathname.split('/')[2] || '';
+  }
+  if (videoId) {
+    if (!/^[\w-]{11}$/.test(videoId)) return null;
+    const embed = new URL(`https://www.youtube-nocookie.com/embed/${videoId}`);
+    embed.searchParams.set('controls', '1');
+    embed.searchParams.set('end', '60');
+    embed.searchParams.set('rel', '0');
+    return { type: 'youtube', url: embed.href };
+  }
+  if (!/\.(mp4|webm|ogg)$/i.test(url.pathname)) return null;
+  return { type: 'file', url: url.href };
+}
 function loadContent() {
   try {
     const raw = localStorage.getItem(CONTENT_KEY);
@@ -251,6 +279,7 @@ function loadContent() {
       }
       return {
         title: p.title, clue: p.clue, code: String(p.code),
+        video: typeof p.video === 'string' && parseVideoSource(p.video) ? p.video : '',
         color: /^#[0-9a-f]{6}$/i.test(p.color) ? p.color : DEFAULT_PLANETS[i % DEFAULT_PLANETS.length].color,
         size: Number.isFinite(p.size) ? clamp(p.size, 1, 2.5) : 1.6,
         dist: Number.isFinite(p.dist) ? Math.max(12, p.dist) : 12 + i * 6,
@@ -541,10 +570,48 @@ $('introText').onclick = () => { clearInterval(introTimer); $('introText').textC
 
 let current = 0;
 function setMsg(text, cls) { const m = $('msg'); m.textContent = text; m.className = cls || ''; }
+function renderClueVideo(value) {
+  const container = $('clueVideo');
+  container.replaceChildren();
+  const source = parseVideoSource(value);
+  container.hidden = !source;
+  if (!source) return;
+
+  if (source.type === 'youtube') {
+    const frame = document.createElement('iframe');
+    frame.src = source.url;
+    frame.title = 'Video de la pista';
+    frame.allow = 'accelerometer; encrypted-media; gyroscope; picture-in-picture';
+    frame.referrerPolicy = 'strict-origin-when-cross-origin';
+    frame.allowFullscreen = true;
+    container.appendChild(frame);
+    return;
+  }
+
+  const video = document.createElement('video');
+  video.src = source.url;
+  video.controls = true;
+  video.playsInline = true;
+  video.preload = 'metadata';
+  const status = document.createElement('div');
+  status.id = 'clueVideoStatus';
+  status.setAttribute('role', 'status');
+  video.addEventListener('timeupdate', () => {
+    if (video.currentTime >= 60) { video.pause(); video.currentTime = 60; }
+  });
+  video.addEventListener('seeking', () => {
+    if (video.currentTime > 60) video.currentTime = 60;
+  });
+  video.addEventListener('error', () => {
+    status.textContent = 'No se pudo cargar el video. Comprueba que el enlace sea público y directo al archivo MP4.';
+  });
+  container.append(video, status);
+}
 function openModal(i) {
   current = i;
   const p = PLANETS[i];
   $('mTitle').textContent = p.title;
+  renderClueVideo(i > done ? '' : p.video);
   setMsg('');
   $('codeInput').value = '';
   if (i > done) {
@@ -565,7 +632,10 @@ function openModal(i) {
   $('modal').classList.add('show');
   if (i === done) setTimeout(() => $('codeInput').focus({ preventScroll: true }), 50);
 }
-function closeModal() { $('modal').classList.remove('show'); }
+function closeModal() {
+  $('modal').classList.remove('show');
+  renderClueVideo('');
+}
 $('close').onclick = closeModal;
 $('modal').addEventListener('pointerdown', e => { if (e.target === $('modal')) closeModal(); });
 addEventListener('keydown', e => {
@@ -640,9 +710,13 @@ function renderPlanetEditor() {
     const title = addEditorField(card, 'Nombre', p.title, 'title', false);
     const clue = addEditorField(card, 'Pista', p.clue, 'clue', true);
     const code = addEditorField(card, 'Respuesta / código numérico', p.code, 'code', false);
-    [title, clue, code].forEach(input => { input.dataset.index = i; });
+    const video = addEditorField(card, 'Enlace del video (YouTube o MP4 público, máximo 1 minuto)', p.video || '', 'video', false);
+    [title, clue, code, video].forEach(input => { input.dataset.index = i; });
     code.inputMode = 'numeric';
     code.maxLength = 12;
+    video.type = 'url';
+    video.placeholder = 'https://youtu.be/... o https://.../video.mp4';
+    video.maxLength = 2048;
     const remove = document.createElement('button');
     remove.className = 'btn';
     remove.type = 'button';
@@ -666,7 +740,7 @@ function openAdminPanel() {
 }
 function newPlanet(index) {
   return {
-    title: `Pista ${index + 1}`, clue: '', code: '',
+    title: `Pista ${index + 1}`, clue: '', code: '', video: '',
     color: ['#ff7aa2', '#7ab8ff', '#ffd07a', '#b69aff', '#7de0c3'][index % 5],
     size: 1.6, dist: 12 + index * 6, speed: Math.max(.035, .1 - index * .01), ring: index % 2 === 1
   };
@@ -713,10 +787,14 @@ $('saveAdminBtn').onclick = () => {
     $('adminStatus').textContent = 'Cada planeta debe tener nombre, pista y una respuesta numérica.';
     return;
   }
+  if (adminDraftPlanets.some(p => p.video && !parseVideoSource(p.video.trim()))) {
+    $('adminStatus').textContent = 'Revisa el video: usa un enlace HTTPS de YouTube o un enlace directo a MP4, WebM u OGG.';
+    return;
+  }
   const planetsChanged = JSON.stringify(PLANETS.map(({ title, clue, code }) => ({ title, clue, code }))) !==
     JSON.stringify(adminDraftPlanets.map(({ title, clue, code }) => ({ title: title.trim(), clue: clue.trim(), code: String(code).trim() })));
   const planets = adminDraftPlanets.map(p => ({
-    ...p, title: p.title.trim(), clue: p.clue.trim(), code: String(p.code).trim()
+    ...p, title: p.title.trim(), clue: p.clue.trim(), code: String(p.code).trim(), video: String(p.video || '').trim()
   }));
   try {
     localStorage.setItem(CONTENT_KEY, JSON.stringify({ intro, finalTitle, finalMessage, planets }));
