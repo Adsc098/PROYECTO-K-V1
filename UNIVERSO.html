@@ -138,7 +138,7 @@
     <label for="editFinalMessage">Mensaje final</label>
     <textarea id="editFinalMessage"></textarea>
     <h2>Planetas, pistas y pruebas</h2>
-    <p class="admin-note">El código es la respuesta de cada prueba. Puedes agregar un enlace público de YouTube o un enlace directo a un video MP4 (máximo 1 minuto) para cada pista. Al cambiar los nombres, pistas, respuestas o cantidad de planetas, el recorrido se reiniciará para mantener el orden correcto.</p>
+    <p class="admin-note">El código es la respuesta de cada prueba. Puedes agregar un enlace público de YouTube o un enlace directo a un video MP4 (máximo 1 minuto) para cada pista. Al cambiar nombres, pistas, respuestas, videos o cantidad de planetas, el recorrido se reiniciará para mostrar los cambios desde el inicio.</p>
     <div id="planetEditorList"></div>
     <div class="admin-actions">
       <button id="addPlanetBtn" class="btn">Agregar planeta</button>
@@ -584,7 +584,13 @@ function renderClueVideo(value) {
     frame.allow = 'accelerometer; encrypted-media; gyroscope; picture-in-picture';
     frame.referrerPolicy = 'strict-origin-when-cross-origin';
     frame.allowFullscreen = true;
-    container.appendChild(frame);
+    const link = document.createElement('a');
+    link.href = value;
+    link.target = '_blank';
+    link.rel = 'noopener noreferrer';
+    link.textContent = '¿No se reproduce? Abrir video en YouTube';
+    link.style.cssText = 'display:inline-block;margin-top:8px;color:var(--gold);font:600 13px var(--sans)';
+    container.append(frame, link);
     return;
   }
 
@@ -605,7 +611,13 @@ function renderClueVideo(value) {
   video.addEventListener('error', () => {
     status.textContent = 'No se pudo cargar el video. Comprueba que el enlace sea público y directo al archivo MP4.';
   });
-  container.append(video, status);
+  const link = document.createElement('a');
+  link.href = source.url;
+  link.target = '_blank';
+  link.rel = 'noopener noreferrer';
+  link.textContent = '¿No se reproduce? Abrir video en otra pestaña';
+  link.style.cssText = 'display:inline-block;margin-top:8px;color:var(--gold);font:600 13px var(--sans)';
+  container.append(video, link, status);
 }
 function openModal(i) {
   current = i;
@@ -791,8 +803,10 @@ $('saveAdminBtn').onclick = () => {
     $('adminStatus').textContent = 'Revisa el video: usa un enlace HTTPS de YouTube o un enlace directo a MP4, WebM u OGG.';
     return;
   }
-  const planetsChanged = JSON.stringify(PLANETS.map(({ title, clue, code }) => ({ title, clue, code }))) !==
-    JSON.stringify(adminDraftPlanets.map(({ title, clue, code }) => ({ title: title.trim(), clue: clue.trim(), code: String(code).trim() })));
+  const planetsChanged = JSON.stringify(PLANETS.map(({ title, clue, code, video }) => ({ title, clue, code, video: video || '' }))) !==
+    JSON.stringify(adminDraftPlanets.map(({ title, clue, code, video }) => ({
+      title: title.trim(), clue: clue.trim(), code: String(code).trim(), video: String(video || '').trim()
+    })));
   const planets = adminDraftPlanets.map(p => ({
     ...p, title: p.title.trim(), clue: p.clue.trim(), code: String(p.code).trim(), video: String(p.video || '').trim()
   }));
